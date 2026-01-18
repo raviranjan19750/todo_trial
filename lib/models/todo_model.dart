@@ -1,22 +1,14 @@
-import 'package:hive/hive.dart';
+import 'package:json_annotation/json_annotation.dart';
 
 part 'todo_model.g.dart';
 
-@HiveType(typeId: 0)
-class TodoModel extends HiveObject {
-  @HiveField(0)
+/// Todo model with nested children support
+@JsonSerializable()
+class TodoModel {
   final String id;
-
-  @HiveField(1)
   String title;
-
-  @HiveField(2)
   bool isCompleted;
-
-  @HiveField(3)
   bool isExpanded;
-
-  @HiveField(4)
   List<TodoModel> children;
 
   TodoModel({
@@ -26,6 +18,12 @@ class TodoModel extends HiveObject {
     this.isExpanded = true,
     List<TodoModel>? children,
   }) : children = children ?? [];
+
+  /// Convert to JSON
+  Map<String, dynamic> toJson() => _$TodoModelToJson(this);
+
+  /// Create from JSON
+  factory TodoModel.fromJson(Map<String, dynamic> json) => _$TodoModelFromJson(json);
 
   @override
   String toString() {
