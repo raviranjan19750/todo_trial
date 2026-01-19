@@ -16,7 +16,6 @@ class _TodoScreenState extends ConsumerState<TodoScreen> {
   @override
   Widget build(BuildContext context) {
     final todos = ref.watch(todoProvider);
-    final notifier = ref.read(todoProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -24,7 +23,7 @@ class _TodoScreenState extends ConsumerState<TodoScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showTodoDialog(notifier),
+        onPressed: () => _showTodoDialog(),
         child: const Icon(Icons.add),
       ),
       body: todos.isEmpty
@@ -32,126 +31,18 @@ class _TodoScreenState extends ConsumerState<TodoScreen> {
           : ListView.builder(
               padding: const EdgeInsets.only(bottom: 80),
               itemCount: todos.length,
-              itemBuilder: (context, index) => _buildTodoTree(todos[index], 0, notifier),
+              itemBuilder: (context, index) => _buildTodoTree(todos[index], 0),
             ),
-    );
-  }
-
-  /// Build empty state
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.checklist_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No todos yet',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tap + to add your first todo!',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Build todo tree recursively
-  Widget _buildTodoTree(TodoModel todo, int depth, TodoNotifier notifier) {
-    return Column(
-      children: [
-        _buildTodoItem(todo, depth, notifier),
-        if (todo.isExpanded)
-          ...todo.children.map((child) => _buildTodoTree(child, depth + 1, notifier)),
-      ],
-    );
-  }
-
-  /// Build single todo item (inline widget)
-  Widget _buildTodoItem(TodoModel todo, int depth, TodoNotifier notifier) {
-    final hasChildren = todo.children.isNotEmpty;
-
-    return Padding(
-      padding: EdgeInsets.only(left: depth * 24.0),
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: ListTile(
-          leading: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Expand/collapse icon
-              if (hasChildren)
-                IconButton(
-                  icon: Icon(
-                    todo.isExpanded ? Icons.expand_less : Icons.expand_more,
-                  ),
-                  onPressed: () => notifier.toggleExpand(todo.id),
-                )
-              else
-                const SizedBox(width: 48),
-              // Checkbox
-              Checkbox(
-                value: todo.isCompleted,
-                onChanged: (_) => notifier.toggleComplete(todo.id),
-              ),
-            ],
-          ),
-          title: Text(
-            todo.title,
-            style: TextStyle(
-              decoration: todo.isCompleted ? TextDecoration.lineThrough : null,
-              color: todo.isCompleted ? Colors.grey : null,
-            ),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Edit button
-              IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 20),
-                onPressed: () => _showTodoDialog(notifier, todoId: todo.id, currentTitle: todo.title),
-                tooltip: 'Edit',
-              ),
-              // Add sub-todo button
-              IconButton(
-                icon: const Icon(Icons.add, size: 20),
-                onPressed: () => _showTodoDialog(notifier, parentId: todo.id),
-                tooltip: 'Add sub-todo',
-              ),
-              // Delete button
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 20),
-                onPressed: () => _confirmDelete(context, todo, notifier),
-                tooltip: 'Delete',
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
   /// Show todo dialog (unified for add/edit)
-  void _showTodoDialog(
-    TodoNotifier notifier, {
+  void _showTodoDialog({
     String? todoId,
     String? currentTitle,
     String? parentId,
   }) {
+    final notifier = ref.read(todoProvider.notifier);
     final isEditMode = todoId != null;
     final controller = TextEditingController(text: currentTitle ?? '');
 
@@ -194,7 +85,10 @@ class _TodoScreenState extends ConsumerState<TodoScreen> {
                   if (isEditMode && editTodoId != null) {
                     notifier.editTodo(editTodoId, controller.text.trim());
                   } else {
-                    notifier.addTodo(controller.text.trim(), parentId: parentId);
+                    notifier.addTodo(
+                      controller.text.trim(),
+                      parentId: parentId,
+                    );
                   }
                   Navigator.pop(context);
                 }
@@ -208,7 +102,8 @@ class _TodoScreenState extends ConsumerState<TodoScreen> {
   }
 
   /// Confirm delete dialog
-  void _confirmDelete(BuildContext context, TodoModel todo, TodoNotifier notifier) {
+  void _confirmDelete(TodoModel todo) {
+    final notifier = ref.read(todoProvider.notifier);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -233,6 +128,109 @@ class _TodoScreenState extends ConsumerState<TodoScreen> {
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build single todo item (inline widget)
+  Widget _buildTodoItem(TodoModel todo, int depth) {
+    final hasChildren = todo.children.isNotEmpty;
+    final notifier = ref.read(todoProvider.notifier);
+
+    return Padding(
+      padding: EdgeInsets.only(left: depth * 24.0),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ListTile(
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Expand/collapse icon
+              if (hasChildren)
+                IconButton(
+                  icon: Icon(
+                    todo.isExpanded ? Icons.expand_less : Icons.expand_more,
+                  ),
+                  onPressed: () => notifier.toggleExpand(todo.id),
+                )
+              else
+                const SizedBox(width: 48),
+              // Checkbox
+              Checkbox(
+                value: todo.isCompleted,
+                onChanged: (_) => notifier.toggleComplete(todo.id),
+              ),
+            ],
+          ),
+          title: Text(
+            todo.title,
+            style: TextStyle(
+              decoration: todo.isCompleted ? TextDecoration.lineThrough : null,
+              color: todo.isCompleted ? Colors.grey : null,
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Edit button
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                onPressed: () =>
+                    _showTodoDialog(todoId: todo.id, currentTitle: todo.title),
+                tooltip: 'Edit',
+              ),
+              // Add sub-todo button
+              IconButton(
+                icon: const Icon(Icons.add, size: 20),
+                onPressed: () => _showTodoDialog(parentId: todo.id),
+                tooltip: 'Add sub-todo',
+              ),
+              // Delete button
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20),
+                onPressed: () => _confirmDelete(todo),
+                tooltip: 'Delete',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build todo tree recursively
+  Widget _buildTodoTree(TodoModel todo, int depth) {
+    return Column(
+      children: [
+        _buildTodoItem(todo, depth),
+        if (todo.isExpanded)
+          ...todo.children.map((child) => _buildTodoTree(child, depth + 1)),
+      ],
+    );
+  }
+
+  /// Build empty state
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.checklist_outlined, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            'No todos yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tap + to add your first todo!',
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
           ),
         ],
       ),

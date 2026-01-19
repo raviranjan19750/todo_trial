@@ -4,10 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../models/todo_model.dart';
 import '../services/storage_service.dart';
 
-/// Storage service provider
-final storageServiceProvider = Provider<StorageService>((ref) {
-  return StorageService();
-});
+
 
 /// Todo list state provider
 final todoProvider = StateNotifierProvider<TodoNotifier, List<TodoModel>>((ref) {
@@ -25,6 +22,97 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
 
   /// Get a mutable copy of the current state
   List<TodoModel> get _mutableState => List.from(state);
+
+
+  /// Helper to add todo to parent
+  List<TodoModel> _addToParent(List<TodoModel> todos, String parentId, TodoModel newTodo) {
+    for (final todo in todos) {
+      if (todo.id == parentId) {
+        todo.children.add(newTodo);
+        return todos;
+      }
+      // Search in children
+      _addToParent(todo.children, parentId, newTodo);
+    }
+    return todos;
+  }
+
+
+  /// Helper to edit todo
+  List<TodoModel> _editById(List<TodoModel> todos, String id, String newTitle) {
+    for (final todo in todos) {
+      if (todo.id == id) {
+        todo.title = newTitle;
+        return todos;
+      }
+      // Search in children
+      _editById(todo.children, id, newTitle);
+    }
+    return todos;
+  }
+
+  /// Helper to delete todo by ID
+  List<TodoModel> _deleteById(List<TodoModel> todos, String id) {
+    for (final todo in todos) {
+      if (todo.id == id) {
+        todos.remove(todo);
+        return todos;
+      }
+      // Search in children
+      _deleteById(todo.children, id);
+    }
+    return todos;
+  }
+
+  /// Recursive helper for cascading delete
+  void _deleteWithCascade(List<TodoModel> todos, String id) {
+    for (final todo in todos) {
+      if (todo.id == id) {
+        todos.remove(todo);
+        return;
+      }
+
+      // Search in children
+      final childrenBefore = todo.children.length;
+      _deleteWithCascade(todo.children, id);
+      final childrenAfter = todo.children.length;
+
+      // If a child was deleted and parent is now empty, delete parent too
+      if (childrenAfter < childrenBefore && todo.children.isEmpty) {
+        todos.remove(todo);
+        return;
+      }
+    }
+  }
+
+  /// Helper to toggle completion
+  List<TodoModel> _toggleCompleteById(List<TodoModel> todos, String id) {
+    for (final todo in todos) {
+      if (todo.id == id) {
+        todo.isCompleted = !todo.isCompleted;
+        return todos;
+      }
+      // Search in children
+      _toggleCompleteById(todo.children, id);
+    }
+    return todos;
+  }
+
+
+
+  /// Helper to toggle expand
+  List<TodoModel> _toggleExpandById(List<TodoModel> todos, String id) {
+    for (final todo in todos) {
+      if (todo.id == id) {
+        todo.isExpanded = !todo.isExpanded;
+        return todos;
+      }
+      // Search in children
+      _toggleExpandById(todo.children, id);
+    }
+    return todos;
+  }
+
 
   /// Load todos from storage
   Future<void> _loadTodos() async {
@@ -58,18 +146,6 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
     await _persist();
   }
 
-  /// Helper to add todo to parent
-  List<TodoModel> _addToParent(List<TodoModel> todos, String parentId, TodoModel newTodo) {
-    for (final todo in todos) {
-      if (todo.id == parentId) {
-        todo.children.add(newTodo);
-        return todos;
-      }
-      // Search in children
-      _addToParent(todo.children, parentId, newTodo);
-    }
-    return todos;
-  }
 
   /// Simple delete - called from UI
   Future<void> deleteTodo(String id) async {
@@ -78,18 +154,7 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
     await _persist();
   }
 
-  /// Helper to delete todo by ID
-  List<TodoModel> _deleteById(List<TodoModel> todos, String id) {
-    for (final todo in todos) {
-      if (todo.id == id) {
-        todos.remove(todo);
-        return todos;
-      }
-      // Search in children
-      _deleteById(todo.children, id);
-    }
-    return todos;
-  }
+
 
   /// KEY REQUIREMENT: Cascading delete - fully implemented
   /// When a todo is deleted, if parent becomes empty, delete parent too (recursive upward)
@@ -100,26 +165,7 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
     await _persist();
   }
 
-  /// Recursive helper for cascading delete
-  void _deleteWithCascade(List<TodoModel> todos, String id) {
-    for (final todo in todos) {
-      if (todo.id == id) {
-        todos.remove(todo);
-        return;
-      }
 
-      // Search in children
-      final childrenBefore = todo.children.length;
-      _deleteWithCascade(todo.children, id);
-      final childrenAfter = todo.children.length;
-
-      // If a child was deleted and parent is now empty, delete parent too
-      if (childrenAfter < childrenBefore && todo.children.isEmpty) {
-        todos.remove(todo);
-        return;
-      }
-    }
-  }
 
   /// Toggle completion status
   Future<void> toggleComplete(String id) async {
@@ -128,18 +174,6 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
     await _persist();
   }
 
-  /// Helper to toggle completion
-  List<TodoModel> _toggleCompleteById(List<TodoModel> todos, String id) {
-    for (final todo in todos) {
-      if (todo.id == id) {
-        todo.isCompleted = !todo.isCompleted;
-        return todos;
-      }
-      // Search in children
-      _toggleCompleteById(todo.children, id);
-    }
-    return todos;
-  }
 
   /// Toggle expand/collapse
   Future<void> toggleExpand(String id) async {
@@ -148,18 +182,6 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
     await _persist();
   }
 
-  /// Helper to toggle expand
-  List<TodoModel> _toggleExpandById(List<TodoModel> todos, String id) {
-    for (final todo in todos) {
-      if (todo.id == id) {
-        todo.isExpanded = !todo.isExpanded;
-        return todos;
-      }
-      // Search in children
-      _toggleExpandById(todo.children, id);
-    }
-    return todos;
-  }
 
   /// Edit todo title
   Future<void> editTodo(String id, String newTitle) async {
@@ -168,16 +190,4 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
     await _persist();
   }
 
-  /// Helper to edit todo
-  List<TodoModel> _editById(List<TodoModel> todos, String id, String newTitle) {
-    for (final todo in todos) {
-      if (todo.id == id) {
-        todo.title = newTitle;
-        return todos;
-      }
-      // Search in children
-      _editById(todo.children, id, newTitle);
-    }
-    return todos;
-  }
 }

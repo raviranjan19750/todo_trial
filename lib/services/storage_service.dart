@@ -1,9 +1,15 @@
 import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/todo_model.dart';
 
 /// Storage service using SharedPreferences for JSON persistence
+
+final storageServiceProvider = Provider<StorageService>((ref) {
+  return StorageService();
+});
+
 class StorageService {
   static const String _todosKey = 'todos_list';
 
@@ -13,11 +19,11 @@ class StorageService {
       print('[StorageService] Loading todos from storage...');
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_todosKey);
-      
+
       if (jsonString == null || jsonString.isEmpty) {
         return [];
       }
-      
+
       final List<dynamic> jsonList = jsonDecode(jsonString);
       return jsonList
           .map((json) => TodoModel.fromJson(json as Map<String, dynamic>))
