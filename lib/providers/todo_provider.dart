@@ -23,6 +23,9 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
     _loadTodos();
   }
 
+  /// Get a mutable copy of the current state
+  List<TodoModel> get _mutableState => List.from(state);
+
   /// Load todos from storage
   Future<void> _loadTodos() async {
     final todos = await _storage.loadTodos();
@@ -48,7 +51,7 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
       state = [...state, newTodo];
     } else {
       // Add as sub-todo
-      final updatedTodos = _addToParent(List.from(state), parentId, newTodo);
+      final updatedTodos = _addToParent(_mutableState, parentId, newTodo);
       state = updatedTodos;
     }
 
@@ -70,20 +73,20 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
 
   /// Simple delete - called from UI
   Future<void> deleteTodo(String id) async {
-    final updatedTodos = _deleteById(List.from(state), id);
+    final updatedTodos = _deleteById(_mutableState, id);
     state = updatedTodos;
     await _persist();
   }
 
   /// Helper to delete todo by ID
   List<TodoModel> _deleteById(List<TodoModel> todos, String id) {
-    for (int i = 0; i < todos.length; i++) {
-      if (todos[i].id == id) {
-        todos.removeAt(i);
+    for (final todo in todos) {
+      if (todo.id == id) {
+        todos.remove(todo);
         return todos;
       }
       // Search in children
-      _deleteById(todos[i].children, id);
+      _deleteById(todo.children, id);
     }
     return todos;
   }
@@ -91,7 +94,7 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
   /// KEY REQUIREMENT: Cascading delete - fully implemented
   /// When a todo is deleted, if parent becomes empty, delete parent too (recursive upward)
   Future<void> deleteTodoWithCascade(String id) async {
-    final updatedTodos = List<TodoModel>.from(state);
+    final updatedTodos = _mutableState;
     _deleteWithCascade(updatedTodos, id);
     state = updatedTodos;
     await _persist();
@@ -99,21 +102,20 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
 
   /// Recursive helper for cascading delete
   void _deleteWithCascade(List<TodoModel> todos, String id) {
-    for (int i = 0; i < todos.length; i++) {
-      if (todos[i].id == id) {
-        // Found it - delete
-        todos.removeAt(i);
+    for (final todo in todos) {
+      if (todo.id == id) {
+        todos.remove(todo);
         return;
       }
 
       // Search in children
-      final childrenBefore = todos[i].children.length;
-      _deleteWithCascade(todos[i].children, id);
-      final childrenAfter = todos[i].children.length;
+      final childrenBefore = todo.children.length;
+      _deleteWithCascade(todo.children, id);
+      final childrenAfter = todo.children.length;
 
       // If a child was deleted and parent is now empty, delete parent too
-      if (childrenAfter < childrenBefore && todos[i].children.isEmpty) {
-        todos.removeAt(i);
+      if (childrenAfter < childrenBefore && todo.children.isEmpty) {
+        todos.remove(todo);
         return;
       }
     }
@@ -121,7 +123,7 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
 
   /// Toggle completion status
   Future<void> toggleComplete(String id) async {
-    final updatedTodos = _toggleCompleteById(List.from(state), id);
+    final updatedTodos = _toggleCompleteById(_mutableState, id);
     state = updatedTodos;
     await _persist();
   }
@@ -141,7 +143,7 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
 
   /// Toggle expand/collapse
   Future<void> toggleExpand(String id) async {
-    final updatedTodos = _toggleExpandById(List.from(state), id);
+    final updatedTodos = _toggleExpandById(_mutableState, id);
     state = updatedTodos;
     await _persist();
   }
@@ -161,7 +163,7 @@ class TodoNotifier extends StateNotifier<List<TodoModel>> {
 
   /// Edit todo title
   Future<void> editTodo(String id, String newTitle) async {
-    final updatedTodos = _editById(List.from(state), id, newTitle);
+    final updatedTodos = _editById(_mutableState, id, newTitle);
     state = updatedTodos;
     await _persist();
   }
